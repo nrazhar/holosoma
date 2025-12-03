@@ -699,7 +699,7 @@ def randomize_mass_startup(
     elif simulator.__class__.__name__ == "IsaacSim":
         try:
             from isaaclab.envs import mdp
-            from isaaclab.managers import SceneEntityCfg
+            from isaaclab.managers import EventTermCfg, SceneEntityCfg
         except ImportError as exc:  # pragma: no cover - defensive
             raise RuntimeError("IsaacSim mass randomization requires isaaclab.") from exc
 
@@ -710,22 +710,42 @@ def randomize_mass_startup(
         if enable_link_mass:
             asset_cfg = SceneEntityCfg("robot", body_names=env.robot_config.randomize_link_body_names)
             asset_cfg.resolve(simulator.scene)  # Required to avoid applying randomization to all bodies
-            mdp.randomize_rigid_body_mass(
+            # randomize_rigid_body_mass is a class that requires instantiation with EventTermCfg
+            event_cfg = EventTermCfg(
+                func=mdp.randomize_rigid_body_mass,
+                params={
+                    "asset_cfg": asset_cfg,
+                    "operation": "scale",
+                    "mass_distribution_params": tuple(link_mass_range),
+                },
+            )
+            mass_randomizer = mdp.randomize_rigid_body_mass(event_cfg, simulator)
+            mass_randomizer(
                 simulator,
                 env_ids_cpu,
-                asset_cfg,
-                tuple(link_mass_range),
+                asset_cfg=asset_cfg,
+                mass_distribution_params=tuple(link_mass_range),
                 operation="scale",
             )
 
         if enable_base_mass:
             asset_cfg = SceneEntityCfg("robot", body_names=[env.robot_config.torso_name])
             asset_cfg.resolve(simulator.scene)  # Required to avoid applying randomization to all bodies
-            mdp.randomize_rigid_body_mass(
+            # randomize_rigid_body_mass is a class that requires instantiation with EventTermCfg
+            event_cfg = EventTermCfg(
+                func=mdp.randomize_rigid_body_mass,
+                params={
+                    "asset_cfg": asset_cfg,
+                    "operation": "add",
+                    "mass_distribution_params": tuple(added_mass_range),
+                },
+            )
+            mass_randomizer = mdp.randomize_rigid_body_mass(event_cfg, simulator)
+            mass_randomizer(
                 simulator,
                 env_ids_cpu,
-                asset_cfg,
-                tuple(added_mass_range),
+                asset_cfg=asset_cfg,
+                mass_distribution_params=tuple(added_mass_range),
                 operation="add",
             )
     elif simulator.simulator_config.mujoco_backend == MujocoBackend.WARP:
@@ -1063,7 +1083,7 @@ def randomize_object_rigid_body_mass_startup(
 
     try:
         from isaaclab.envs import mdp
-        from isaaclab.managers import SceneEntityCfg
+        from isaaclab.managers import EventTermCfg, SceneEntityCfg
 
     except ImportError as exc:  # pragma: no cover - defensive
         raise RuntimeError("IsaacSim mass randomization requires isaaclab.") from exc
@@ -1075,11 +1095,21 @@ def randomize_object_rigid_body_mass_startup(
     asset_cfg = SceneEntityCfg("object", body_names=".*")
     asset_cfg.resolve(simulator.scene)
 
-    mdp.randomize_rigid_body_mass(
+    # randomize_rigid_body_mass is a class that requires instantiation with EventTermCfg
+    event_cfg = EventTermCfg(
+        func=mdp.randomize_rigid_body_mass,
+        params={
+            "asset_cfg": asset_cfg,
+            "operation": "add",
+            "mass_distribution_params": tuple(mass_distribution_params),
+        },
+    )
+    mass_randomizer = mdp.randomize_rigid_body_mass(event_cfg, simulator)
+    mass_randomizer(
         simulator,
         env_ids_cpu,
-        asset_cfg,
-        tuple(mass_distribution_params),
+        asset_cfg=asset_cfg,
+        mass_distribution_params=tuple(mass_distribution_params),
         operation="add",
     )
 
