@@ -25,7 +25,7 @@ if [[ ! -f $SENTINEL_FILE ]]; then
     $CONDA_ROOT/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main
     $CONDA_ROOT/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
     $CONDA_ROOT/bin/conda install -y mamba -c conda-forge -n base
-    MAMBA_ROOT_PREFIX=$CONDA_ROOT $CONDA_ROOT/bin/mamba create -y -n hssim python=3.10 -c conda-forge --override-channels
+    MAMBA_ROOT_PREFIX=$CONDA_ROOT $CONDA_ROOT/bin/mamba create -y -n hssim python=3.11 -c conda-forge --override-channels
   fi
 
   source $CONDA_ROOT/bin/activate hssim
@@ -39,15 +39,28 @@ if [[ ! -f $SENTINEL_FILE ]]; then
   # Install IsaacSim
   pip install --upgrade pip
   # Pinning triton version. It's a dep of a dep, but seeing issues with 3.4.0+
-  pip install torch==2.5.1 torchvision==0.20.1 triton==3.1.0 --index-url https://download.pytorch.org/whl/cu118
+  pip install -U torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu128  
   # Install dependencies from PyPI first
   pip install pyperclip
   # Then install isaacsim from NVIDIA index only
-  pip install 'isaacsim[all,extscache]==4.5.0' --index-url https://pypi.org/simple
+  pip install "isaacsim[all,extscache]==5.1.0" --extra-index-url https://pypi.nvidia.com
 
   if [[ ! -d $WORKSPACE_DIR/IsaacLab ]]; then
-    git clone https://github.com/isaac-sim/IsaacLab.git --branch v2.1.0 $WORKSPACE_DIR/IsaacLab
+    git clone https://github.com/isaac-sim/IsaacLab.git $WORKSPACE_DIR/IsaacLab
   fi
+  sudo apt install -y cmake build-essential
+  
+  # Install CycloneDDS (required for Unitree SDK)
+  if [[ ! -d $WORKSPACE_DIR/cyclonedds ]]; then
+    git clone https://github.com/eclipse-cyclonedds/cyclonedds -b releases/0.10.x $WORKSPACE_DIR/cyclonedds
+  fi
+  
+  if [[ ! -d $WORKSPACE_DIR/cyclonedds/install ]]; then
+      cd $WORKSPACE_DIR/cyclonedds && mkdir -p build install && cd build
+      cmake .. -DCMAKE_INSTALL_PREFIX=../install
+      cmake --build . --target install
+  fi
+  export CYCLONEDDS_HOME="$WORKSPACE_DIR/cyclonedds/install"
 
   # Install Unitree Python SDK for sim2sim
   if [[ ! -d $WORKSPACE_DIR/unitree_sdk2_python ]]; then
@@ -55,7 +68,7 @@ if [[ ! -f $SENTINEL_FILE ]]; then
   fi
   pip install -e $WORKSPACE_DIR/unitree_sdk2_python/
 
-  sudo apt install -y cmake build-essential
+  
   cd $WORKSPACE_DIR/IsaacLab
   # work-around for egl_probe cmake max version issue
   export CMAKE_POLICY_VERSION_MINIMUM=3.5
